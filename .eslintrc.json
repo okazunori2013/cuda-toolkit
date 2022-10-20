@@ -4,7 +4,7 @@
     "@typescript-eslint",
     "prettier",
     "github",
-    "import"
+    "escompat"
   ],
   "extends": [
     "plugin:github/recommended",
