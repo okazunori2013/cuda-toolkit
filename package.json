@@ -14,16 +14,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Jimver/cuda-toolkit.git"
+    "url": "git+https://github.com/okazunori2013/cuda-toolkit.git"
   },
   "keywords": [],
   "author": "Jim Verheijde",
   "bugs": {
-    "url": "https://github.com/Jimver/cuda-toolkit/issues"
+    "url": "https://github.com/okazunori2013/cuda-toolkit/issues"
   },
-  "homepage": "https://github.com/Jimver/cuda-toolkit#readme",
+  "homepage": "https://github.com/okazunori2013/cuda-toolkit#readme",
   "volta": {
-    "node": "12.22.7"
+    "node": "16.18.0"
   },
   "license": "MIT",
   "dependencies": {
