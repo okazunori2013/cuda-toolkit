@@ -29,76 +29,61 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.aptInstall = exports.aptSetup = exports.useApt = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const platform_1 = __nccwpck_require__(9238);
 const exec_1 = __nccwpck_require__(1514);
 const run_command_1 = __nccwpck_require__(9042);
-function useApt(method) {
-    return __awaiter(this, void 0, void 0, function* () {
-        return method === 'network' && (yield (0, platform_1.getOs)()) === platform_1.OSType.linux;
-    });
+async function useApt(method) {
+    return method === 'network' && (await (0, platform_1.getOs)()) === platform_1.OSType.linux;
 }
 exports.useApt = useApt;
-function aptSetup(version) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const osType = yield (0, platform_1.getOs)();
-        if (osType !== platform_1.OSType.linux) {
-            throw new Error(`apt setup can only be run on linux runners! Current os type: ${osType}`);
-        }
-        core.debug(`Setup packages for ${version}`);
-        const ubuntuVersion = yield (0, run_command_1.execReturnOutput)('lsb_release', ['-sr']);
-        const ubuntuVersionNoDot = ubuntuVersion.replace('.', '');
-        const pinFilename = `cuda-ubuntu${ubuntuVersionNoDot}.pin`;
-        const arch = `x86_64`;
-        const pinUrl = `https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/${pinFilename}`;
-        const repoUrl = `http://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/`;
-        const keyRingVersion = `1.0-1`;
-        const keyRingUrl = `https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/cuda-keyring_${keyRingVersion}_all.deb`;
-        const keyRingFilename = `cuda_keyring.deb`;
-        core.debug(`Pin filename: ${pinFilename}`);
-        core.debug(`Pin url: ${pinUrl}`);
-        core.debug(`Keyring url: ${keyRingUrl}`);
-        core.debug(`Downloading keyring`);
-        yield (0, exec_1.exec)(`wget ${keyRingUrl} -O ${keyRingFilename}`);
-        yield (0, exec_1.exec)(`sudo dpkg -i ${keyRingFilename}`);
-        core.debug('Adding CUDA Repository');
-        yield (0, exec_1.exec)(`wget ${pinUrl}`);
-        yield (0, exec_1.exec)(`sudo mv ${pinFilename} /etc/apt/preferences.d/cuda-repository-pin-600`);
-        yield (0, exec_1.exec)(`sudo add-apt-repository "deb ${repoUrl} /"`);
-        yield (0, exec_1.exec)(`sudo apt-get update`);
-    });
+async function aptSetup(version) {
+    const osType = await (0, platform_1.getOs)();
+    if (osType !== platform_1.OSType.linux) {
+        throw new Error(`apt setup can only be run on linux runners! Current os type: ${osType}`);
+    }
+    core.debug(`Setup packages for ${version}`);
+    const ubuntuVersion = await (0, run_command_1.execReturnOutput)('lsb_release', ['-sr']);
+    const ubuntuVersionNoDot = ubuntuVersion.replace('.', '');
+    const pinFilename = `cuda-ubuntu${ubuntuVersionNoDot}.pin`;
+    const arch = `x86_64`;
+    const pinUrl = `https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/${pinFilename}`;
+    const repoUrl = `http://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/`;
+    const keyRingVersion = `1.0-1`;
+    const keyRingUrl = `https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntuVersionNoDot}/${arch}/cuda-keyring_${keyRingVersion}_all.deb`;
+    const keyRingFilename = `cuda_keyring.deb`;
+    core.debug(`Pin filename: ${pinFilename}`);
+    core.debug(`Pin url: ${pinUrl}`);
+    core.debug(`Keyring url: ${keyRingUrl}`);
+    core.debug(`Downloading keyring`);
+    await (0, exec_1.exec)(`wget ${keyRingUrl} -O ${keyRingFilename}`);
+    await (0, exec_1.exec)(`sudo dpkg -i ${keyRingFilename}`);
+    core.debug('Adding CUDA Repository');
+    await (0, exec_1.exec)(`wget ${pinUrl}`);
+    await (0, exec_1.exec)(`sudo mv ${pinFilename} /etc/apt/preferences.d/cuda-repository-pin-600`);
+    await (0, exec_1.exec)(`sudo add-apt-repository "deb ${repoUrl} /"`);
+    await (0, exec_1.exec)(`sudo apt-get update`);
 }
 exports.aptSetup = aptSetup;
-function aptInstall(version, subPackages) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const osType = yield (0, platform_1.getOs)();
-        if (osType !== platform_1.OSType.linux) {
-            throw new Error(`apt install can only be run on linux runners! Current os type: ${osType}`);
-        }
-        if (subPackages.length === 0) {
-            // Install everything
-            const packageName = `cuda-${version.major}-${version.minor}`;
-            core.debug(`Install package: ${packageName}`);
-            return yield (0, exec_1.exec)(`sudo apt-get -y install`, [packageName]);
-        }
-        else {
-            // Only install specified packages
-            const versionedSubPackages = subPackages.map(subPackage => `cuda-${subPackage}-${version.major}-${version.minor}`);
-            core.debug(`Only install subpackages: ${versionedSubPackages}`);
-            return yield (0, exec_1.exec)(`sudo apt-get -y install`, versionedSubPackages);
-        }
-    });
+async function aptInstall(version, subPackages) {
+    const osType = await (0, platform_1.getOs)();
+    if (osType !== platform_1.OSType.linux) {
+        throw new Error(`apt install can only be run on linux runners! Current os type: ${osType}`);
+    }
+    if (subPackages.length === 0) {
+        // Install everything
+        const packageName = `cuda-${version.major}-${version.minor}`;
+        core.debug(`Install package: ${packageName}`);
+        return await (0, exec_1.exec)(`sudo apt-get -y install`, [packageName]);
+    }
+    else {
+        // Only install specified packages
+        const versionedSubPackages = subPackages.map(subPackage => `cuda-${subPackage}-${version.major}-${version.minor}`);
+        core.debug(`Only install subpackages: ${versionedSubPackages}`);
+        return await (0, exec_1.exec)(`sudo apt-get -y install`, versionedSubPackages);
+    }
 }
 exports.aptInstall = aptInstall;
 
@@ -133,15 +118,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -157,88 +133,86 @@ const windows_links_1 = __nccwpck_require__(5986);
 const fs_1 = __importDefault(__nccwpck_require__(7147));
 const get_links_1 = __nccwpck_require__(1451);
 // Download helper which returns the installer executable and caches it for next runs
-function download(version, method, useGitHubCache) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // First try to find tool with desired version in tool cache (local to machine)
-        const toolName = 'cuda_installer';
-        const osType = yield (0, platform_1.getOs)();
-        const osRelease = yield (0, platform_1.getRelease)();
-        const toolId = `${toolName}-${osType}-${osRelease}`;
-        const toolPath = tc.find(toolId, `${version}`);
-        // Path that contains the executable file
-        let executablePath;
-        if (toolPath) {
-            // Tool is already in cache
-            core.debug(`Found in local machine cache ${toolPath}`);
-            executablePath = toolPath;
+async function download(version, method, useGitHubCache) {
+    // First try to find tool with desired version in tool cache (local to machine)
+    const toolName = 'cuda_installer';
+    const osType = await (0, platform_1.getOs)();
+    const osRelease = await (0, platform_1.getRelease)();
+    const toolId = `${toolName}-${osType}-${osRelease}`;
+    const toolPath = tc.find(toolId, `${version}`);
+    // Path that contains the executable file
+    let executablePath;
+    if (toolPath) {
+        // Tool is already in cache
+        core.debug(`Found in local machine cache ${toolPath}`);
+        executablePath = toolPath;
+    }
+    else {
+        // Second option, get tool from GitHub cache if enabled
+        const cacheKey = `${toolId}-${version}`;
+        const cachePath = cacheKey;
+        let cacheResult;
+        if (useGitHubCache) {
+            cacheResult = await cache.restoreCache([cachePath], cacheKey);
+        }
+        if (cacheResult !== undefined) {
+            core.debug(`Found in GitHub cache ${cachePath}`);
+            executablePath = cachePath;
         }
         else {
-            // Second option, get tool from GitHub cache if enabled
-            const cacheKey = `${toolId}-${version}`;
-            const cachePath = cacheKey;
-            let cacheResult;
+            // Final option, download tool from NVIDIA servers
+            core.debug(`Not found in local/GitHub cache, downloading...`);
+            // Get download URL
+            const url = await getDownloadURL(method, version);
+            // Get intsaller filename extension depending on OS
+            const fileExtension = getFileExtension(osType);
+            const destFileName = `${toolId}_${version}.${fileExtension}`;
+            // Download executable
+            const downloadPath = await tc.downloadTool(url.toString(), destFileName);
+            // Copy file to GitHub cachePath
+            core.debug(`Copying ${destFileName} to ${cachePath}`);
+            await io.mkdirP(cachePath);
+            await io.cp(destFileName, cachePath);
+            // Cache download to local machine cache
+            const localCachePath = await tc.cacheFile(downloadPath, destFileName, `${toolName}-${osType}`, `${version}`);
+            core.debug(`Cached download to local machine cache at ${localCachePath}`);
+            // Cache download to GitHub cache if enabled
             if (useGitHubCache) {
-                cacheResult = yield cache.restoreCache([cachePath], cacheKey);
-            }
-            if (cacheResult !== undefined) {
-                core.debug(`Found in GitHub cache ${cachePath}`);
-                executablePath = cachePath;
-            }
-            else {
-                // Final option, download tool from NVIDIA servers
-                core.debug(`Not found in local/GitHub cache, downloading...`);
-                // Get download URL
-                const url = yield getDownloadURL(method, version);
-                // Get intsaller filename extension depending on OS
-                const fileExtension = getFileExtension(osType);
-                const destFileName = `${toolId}_${version}.${fileExtension}`;
-                // Download executable
-                const downloadPath = yield tc.downloadTool(url.toString(), destFileName);
-                // Copy file to GitHub cachePath
-                core.debug(`Copying ${destFileName} to ${cachePath}`);
-                yield io.mkdirP(cachePath);
-                yield io.cp(destFileName, cachePath);
-                // Cache download to local machine cache
-                const localCachePath = yield tc.cacheFile(downloadPath, destFileName, `${toolName}-${osType}`, `${version}`);
-                core.debug(`Cached download to local machine cache at ${localCachePath}`);
-                // Cache download to GitHub cache if enabled
-                if (useGitHubCache) {
-                    const cacheId = yield cache.saveCache([cachePath], cacheKey);
-                    if (cacheId !== -1) {
-                        core.debug(`Cached download to GitHub cache with cache id ${cacheId}`);
-                    }
-                    else {
-                        core.debug(`Did not cache, cache possibly already exists`);
-                    }
+                const cacheId = await cache.saveCache([cachePath], cacheKey);
+                if (cacheId !== -1) {
+                    core.debug(`Cached download to GitHub cache with cache id ${cacheId}`);
                 }
-                executablePath = localCachePath;
+                else {
+                    core.debug(`Did not cache, cache possibly already exists`);
+                }
             }
+            executablePath = localCachePath;
         }
-        // String with full executable path
-        let fullExecutablePath;
-        // Get list of files in tool cache
-        const filesInCache = yield (yield glob.create(`${executablePath}/**.*`)).glob();
-        core.debug(`Files in tool cache:`);
-        for (const f of filesInCache) {
-            core.debug(f);
-        }
-        if (filesInCache.length > 1) {
-            throw new Error(`Got multiple file in tool cache: ${filesInCache.length}`);
-        }
-        else if (filesInCache.length === 0) {
-            throw new Error(`Got no files in tool cahce`);
-        }
-        else {
-            fullExecutablePath = filesInCache[0];
-        }
-        // Make file executable on linux
-        if ((yield (0, platform_1.getOs)()) === platform_1.OSType.linux) {
-            // 0755 octal notation permission is: owner(r,w,x), group(r,w,x), other(r,x) where r=read, w=write, x=execute
-            yield fs_1.default.promises.chmod(fullExecutablePath, '0755');
-        }
-        // Return full executable path
-        return fullExecutablePath;
-    });
+    }
+    // String with full executable path
+    let fullExecutablePath;
+    // Get list of files in tool cache
+    const filesInCache = await (await glob.create(`${executablePath}/**.*`)).glob();
+    core.debug(`Files in tool cache:`);
+    for (const f of filesInCache) {
+        core.debug(f);
+    }
+    if (filesInCache.length > 1) {
+        throw new Error(`Got multiple file in tool cache: ${filesInCache.length}`);
+    }
+    else if (filesInCache.length === 0) {
+        throw new Error(`Got no files in tool cahce`);
+    }
+    else {
+        fullExecutablePath = filesInCache[0];
+    }
+    // Make file executable on linux
+    if ((await (0, platform_1.getOs)()) === platform_1.OSType.linux) {
+        // 0755 octal notation permission is: owner(r,w,x), group(r,w,x), other(r,x) where r=read, w=write, x=execute
+        await fs_1.default.promises.chmod(fullExecutablePath, '0755');
+    }
+    // Return full executable path
+    return fullExecutablePath;
 }
 exports.download = download;
 function getFileExtension(osType) {
@@ -249,22 +223,20 @@ function getFileExtension(osType) {
             return 'run';
     }
 }
-function getDownloadURL(method, version) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const links = yield (0, get_links_1.getLinks)();
-        switch (method) {
-            case 'local':
-                return links.getLocalURLFromCudaVersion(version);
-            case 'network':
-                if (!(links instanceof windows_links_1.WindowsLinks)) {
-                    core.debug(`Tried to get windows links but got linux links instance`);
-                    throw new Error(`Network mode is not supported by linux, shouldn't even get here`);
-                }
-                return links.getNetworkURLFromCudaVersion(version);
-            default:
-                throw new Error(`Invalid method: expected either 'local' or 'network', got '${method}'`);
-        }
-    });
+async function getDownloadURL(method, version) {
+    const links = await (0, get_links_1.getLinks)();
+    switch (method) {
+        case 'local':
+            return links.getLocalURLFromCudaVersion(version);
+        case 'network':
+            if (!(links instanceof windows_links_1.WindowsLinks)) {
+                core.debug(`Tried to get windows links but got linux links instance`);
+                throw new Error(`Network mode is not supported by linux, shouldn't even get here`);
+            }
+            return links.getNetworkURLFromCudaVersion(version);
+        default:
+            throw new Error(`Invalid method: expected either 'local' or 'network', got '${method}'`);
+    }
 }
 
 
@@ -298,89 +270,78 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.install = void 0;
 const artifact = __importStar(__nccwpck_require__(2605));
 const core = __importStar(__nccwpck_require__(2186));
 const platform_1 = __nccwpck_require__(9238);
 const exec_1 = __nccwpck_require__(1514);
-function install(executablePath, version, subPackagesArray, linuxLocalArgsArray) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // Install arguments, see: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile-advanced
-        // and https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html
-        let installArgs;
-        // Command string that is executed
-        let command;
-        // Subset of subpackages to install instead of everything, see: https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html#install-cuda-software
-        const subPackages = subPackagesArray;
-        // Execution options which contain callback functions for stdout and stderr of install process
-        const execOptions = {
-            listeners: {
-                stdout: (data) => {
-                    core.debug(data.toString());
-                },
-                stderr: (data) => {
-                    core.debug(`Error: ${data.toString()}`);
+async function install(executablePath, version, subPackagesArray, linuxLocalArgsArray) {
+    // Install arguments, see: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#runfile-advanced
+    // and https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html
+    let installArgs;
+    // Command string that is executed
+    let command;
+    // Subset of subpackages to install instead of everything, see: https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html#install-cuda-software
+    const subPackages = subPackagesArray;
+    // Execution options which contain callback functions for stdout and stderr of install process
+    const execOptions = {
+        listeners: {
+            stdout: (data) => {
+                core.debug(data.toString());
+            },
+            stderr: (data) => {
+                core.debug(`Error: ${data.toString()}`);
+            }
+        }
+    };
+    // Configure OS dependent run command and args
+    switch (await (0, platform_1.getOs)()) {
+        case platform_1.OSType.linux:
+            // Root permission needed on linux
+            command = `sudo ${executablePath}`;
+            // Install silently, and add additional arguments
+            installArgs = ['--silent'].concat(linuxLocalArgsArray);
+            break;
+        case platform_1.OSType.windows:
+            // Windows handles permissions automatically
+            command = executablePath;
+            // Install silently
+            installArgs = ['-s'];
+            // Add subpackages to command args (if any)
+            installArgs = installArgs.concat(subPackages.map(subPackage => {
+                // Display driver sub package name is not dependent on version
+                if (subPackage === 'Display.Driver') {
+                    return subPackage;
                 }
-            }
-        };
-        // Configure OS dependent run command and args
-        switch (yield (0, platform_1.getOs)()) {
-            case platform_1.OSType.linux:
-                // Root permission needed on linux
-                command = `sudo ${executablePath}`;
-                // Install silently, and add additional arguments
-                installArgs = ['--silent'].concat(linuxLocalArgsArray);
-                break;
-            case platform_1.OSType.windows:
-                // Windows handles permissions automatically
-                command = executablePath;
-                // Install silently
-                installArgs = ['-s'];
-                // Add subpackages to command args (if any)
-                installArgs = installArgs.concat(subPackages.map(subPackage => {
-                    // Display driver sub package name is not dependent on version
-                    if (subPackage === 'Display.Driver') {
-                        return subPackage;
-                    }
-                    return `${subPackage}_${version.major}.${version.minor}`;
-                }));
-                break;
+                return `${subPackage}_${version.major}.${version.minor}`;
+            }));
+            break;
+    }
+    // Run installer
+    try {
+        core.debug(`Running install executable: ${executablePath}`);
+        const exitCode = await (0, exec_1.exec)(command, installArgs, execOptions);
+        core.debug(`Installer exit code: ${exitCode}`);
+    }
+    catch (error) {
+        core.debug(`Error during installation: ${error}`);
+        throw error;
+    }
+    finally {
+        // Always upload installation log regardless of error
+        if ((await (0, platform_1.getOs)()) === platform_1.OSType.linux) {
+            const artifactClient = artifact.create();
+            const artifactName = 'install-log';
+            const files = ['/var/log/cuda-installer.log'];
+            const rootDirectory = '/var/log';
+            const artifactOptions = {
+                continueOnError: true
+            };
+            const uploadResult = await artifactClient.uploadArtifact(artifactName, files, rootDirectory, artifactOptions);
+            core.debug(`Upload result: ${uploadResult}`);
         }
-        // Run installer
-        try {
-            core.debug(`Running install executable: ${executablePath}`);
-            const exitCode = yield (0, exec_1.exec)(command, installArgs, execOptions);
-            core.debug(`Installer exit code: ${exitCode}`);
-        }
-        catch (error) {
-            core.debug(`Error during installation: ${error}`);
-            throw error;
-        }
-        finally {
-            // Always upload installation log regardless of error
-            if ((yield (0, platform_1.getOs)()) === platform_1.OSType.linux) {
-                const artifactClient = artifact.create();
-                const artifactName = 'install-log';
-                const files = ['/var/log/cuda-installer.log'];
-                const rootDirectory = '/var/log';
-                const artifactOptions = {
-                    continueOnError: true
-                };
-                const uploadResult = yield artifactClient.uploadArtifact(artifactName, files, rootDirectory, artifactOptions);
-                core.debug(`Upload result: ${uploadResult}`);
-            }
-        }
-    });
+    }
 }
 exports.install = install;
 
@@ -388,35 +349,24 @@ exports.install = install;
 /***/ }),
 
 /***/ 1451:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getLinks = void 0;
 const platform_1 = __nccwpck_require__(9238);
 const linux_links_1 = __nccwpck_require__(8377);
 const windows_links_1 = __nccwpck_require__(5986);
 // Platform independent getter for ILinks interface
-function getLinks() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const osType = yield (0, platform_1.getOs)();
-        switch (osType) {
-            case platform_1.OSType.windows:
-                return windows_links_1.WindowsLinks.Instance;
-            case platform_1.OSType.linux:
-                return linux_links_1.LinuxLinks.Instance;
-        }
-    });
+async function getLinks() {
+    const osType = await (0, platform_1.getOs)();
+    switch (osType) {
+        case platform_1.OSType.windows:
+            return windows_links_1.WindowsLinks.Instance;
+        case platform_1.OSType.linux:
+            return linux_links_1.LinuxLinks.Instance;
+    }
 }
 exports.getLinks = getLinks;
 
@@ -851,15 +801,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
 const method_1 = __nccwpck_require__(3607);
@@ -869,82 +810,80 @@ const downloader_1 = __nccwpck_require__(5587);
 const version_1 = __nccwpck_require__(8217);
 const installer_1 = __nccwpck_require__(1480);
 const update_path_1 = __nccwpck_require__(4985);
-function run() {
-    return __awaiter(this, void 0, void 0, function* () {
+async function run() {
+    try {
+        const cuda = core.getInput('cuda');
+        core.debug(`Desired cuda version: ${cuda}`);
+        const subPackages = core.getInput('sub-packages');
+        core.debug(`Desired subPackes: ${subPackages}`);
+        const methodString = core.getInput('method');
+        core.debug(`Desired method: ${methodString}`);
+        const linuxLocalArgs = core.getInput('linux-local-args');
+        core.debug(`Desired local linux args: ${linuxLocalArgs}`);
+        const useGitHubCache = core.getBooleanInput('use-github-cache');
+        core.debug(`Desired GitHub cache usage: ${useGitHubCache}`);
+        // Parse subPackages array
+        let subPackagesArray = [];
         try {
-            const cuda = core.getInput('cuda');
-            core.debug(`Desired cuda version: ${cuda}`);
-            const subPackages = core.getInput('sub-packages');
-            core.debug(`Desired subPackes: ${subPackages}`);
-            const methodString = core.getInput('method');
-            core.debug(`Desired method: ${methodString}`);
-            const linuxLocalArgs = core.getInput('linux-local-args');
-            core.debug(`Desired local linux args: ${linuxLocalArgs}`);
-            const useGitHubCache = core.getBooleanInput('use-github-cache');
-            core.debug(`Desired GitHub cache usage: ${useGitHubCache}`);
-            // Parse subPackages array
-            let subPackagesArray = [];
-            try {
-                subPackagesArray = JSON.parse(subPackages);
-                // TODO verify that elements are valid package names (nvcc, etc.)
-            }
-            catch (error) {
-                const errString = `Error parsing input 'sub-packages' to a JSON string array: ${subPackages}`;
-                core.debug(errString);
-                throw new Error(errString);
-            }
-            // Parse method
-            const methodParsed = (0, method_1.parseMethod)(methodString);
-            core.debug(`Parsed method: ${methodParsed}`);
-            // Parse version string
-            const version = yield (0, version_1.getVersion)(cuda, methodParsed);
-            // Parse linuxLocalArgs array
-            let linuxLocalArgsArray = [];
-            try {
-                linuxLocalArgsArray = JSON.parse(linuxLocalArgs);
-                // TODO verify that elements are valid package names (--samples, --driver, --toolkit, etc.)
-            }
-            catch (error) {
-                const errString = `Error parsing input 'linux-local-args' to a JSON string array: ${linuxLocalArgs}`;
-                core.debug(errString);
-                throw new Error(errString);
-            }
-            // Check if subPackages are specified in 'local' method on Linux
-            if (methodParsed === 'local' &&
-                subPackagesArray.length > 0 &&
-                (yield (0, platform_1.getOs)()) === platform_1.OSType.linux) {
-                throw new Error(`Subpackages on 'local' method is not supported on Linux, use 'network' instead`);
-            }
-            // Linux network install (uses apt repository)
-            const useAptInstall = yield (0, apt_installer_1.useApt)(methodParsed);
-            if (useAptInstall) {
-                // Setup aptitude repos
-                yield (0, apt_installer_1.aptSetup)(version);
-                // Install packages
-                const installResult = yield (0, apt_installer_1.aptInstall)(version, subPackagesArray);
-                core.debug(`Install result: ${installResult}`);
-            }
-            else {
-                // Download
-                const executablePath = yield (0, downloader_1.download)(version, methodParsed, useGitHubCache);
-                // Install
-                yield (0, installer_1.install)(executablePath, version, subPackagesArray, linuxLocalArgsArray);
-            }
-            // Add CUDA environment variables to GitHub environment variables
-            const cudaPath = yield (0, update_path_1.updatePath)(version);
-            // Set output variables
-            core.setOutput('cuda', cuda);
-            core.setOutput('CUDA_PATH', cudaPath);
+            subPackagesArray = JSON.parse(subPackages);
+            // TODO verify that elements are valid package names (nvcc, etc.)
         }
         catch (error) {
-            if (error instanceof Error) {
-                core.setFailed(error);
-            }
-            else {
-                core.setFailed('Unknown error');
-            }
+            const errString = `Error parsing input 'sub-packages' to a JSON string array: ${subPackages}`;
+            core.debug(errString);
+            throw new Error(errString);
         }
-    });
+        // Parse method
+        const methodParsed = (0, method_1.parseMethod)(methodString);
+        core.debug(`Parsed method: ${methodParsed}`);
+        // Parse version string
+        const version = await (0, version_1.getVersion)(cuda, methodParsed);
+        // Parse linuxLocalArgs array
+        let linuxLocalArgsArray = [];
+        try {
+            linuxLocalArgsArray = JSON.parse(linuxLocalArgs);
+            // TODO verify that elements are valid package names (--samples, --driver, --toolkit, etc.)
+        }
+        catch (error) {
+            const errString = `Error parsing input 'linux-local-args' to a JSON string array: ${linuxLocalArgs}`;
+            core.debug(errString);
+            throw new Error(errString);
+        }
+        // Check if subPackages are specified in 'local' method on Linux
+        if (methodParsed === 'local' &&
+            subPackagesArray.length > 0 &&
+            (await (0, platform_1.getOs)()) === platform_1.OSType.linux) {
+            throw new Error(`Subpackages on 'local' method is not supported on Linux, use 'network' instead`);
+        }
+        // Linux network install (uses apt repository)
+        const useAptInstall = await (0, apt_installer_1.useApt)(methodParsed);
+        if (useAptInstall) {
+            // Setup aptitude repos
+            await (0, apt_installer_1.aptSetup)(version);
+            // Install packages
+            const installResult = await (0, apt_installer_1.aptInstall)(version, subPackagesArray);
+            core.debug(`Install result: ${installResult}`);
+        }
+        else {
+            // Download
+            const executablePath = await (0, downloader_1.download)(version, methodParsed, useGitHubCache);
+            // Install
+            await (0, installer_1.install)(executablePath, version, subPackagesArray, linuxLocalArgsArray);
+        }
+        // Add CUDA environment variables to GitHub environment variables
+        const cudaPath = await (0, update_path_1.updatePath)(version);
+        // Set output variables
+        core.setOutput('cuda', cuda);
+        core.setOutput('CUDA_PATH', cudaPath);
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            core.setFailed(error);
+        }
+        else {
+            core.setFailed('Unknown error');
+        }
+    }
 }
 run();
 
@@ -978,15 +917,6 @@ exports.parseMethod = parseMethod;
 
 "use strict";
 
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -999,25 +929,21 @@ var OSType;
     OSType["windows"] = "windows";
     OSType["linux"] = "linux";
 })(OSType = exports.OSType || (exports.OSType = {}));
-function getOs() {
-    return __awaiter(this, void 0, void 0, function* () {
-        const osPlatform = os_1.default.platform();
-        switch (osPlatform) {
-            case 'win32':
-                return OSType.windows;
-            case 'linux':
-                return OSType.linux;
-            default:
-                (0, core_1.debug)(`Unsupported OS: ${osPlatform}`);
-                throw new Error(`Unsupported OS: ${osPlatform}`);
-        }
-    });
+async function getOs() {
+    const osPlatform = os_1.default.platform();
+    switch (osPlatform) {
+        case 'win32':
+            return OSType.windows;
+        case 'linux':
+            return OSType.linux;
+        default:
+            (0, core_1.debug)(`Unsupported OS: ${osPlatform}`);
+            throw new Error(`Unsupported OS: ${osPlatform}`);
+    }
 }
 exports.getOs = getOs;
-function getRelease() {
-    return __awaiter(this, void 0, void 0, function* () {
-        return os_1.default.release();
-    });
+async function getRelease() {
+    return os_1.default.release();
 }
 exports.getRelease = getRelease;
 
@@ -1052,38 +978,27 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.execReturnOutput = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const exec_1 = __nccwpck_require__(1514);
-function execReturnOutput(command, args = []) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let result = '';
-        const execOptions = {
-            listeners: {
-                stdout: (data) => {
-                    result += data.toString();
-                },
-                stderr: (data) => {
-                    core.debug(`Error: ${data.toString()}`);
-                }
+async function execReturnOutput(command, args = []) {
+    let result = '';
+    const execOptions = {
+        listeners: {
+            stdout: (data) => {
+                result += data.toString();
+            },
+            stderr: (data) => {
+                core.debug(`Error: ${data.toString()}`);
             }
-        };
-        const exitCode = yield (0, exec_1.exec)(command, args, execOptions);
-        if (exitCode) {
-            core.debug(`Error executing: ${command}. Exit code: ${exitCode}`);
         }
-        return result.trim();
-    });
+    };
+    const exitCode = await (0, exec_1.exec)(command, args, execOptions);
+    if (exitCode) {
+        core.debug(`Error executing: ${command}. Exit code: ${exitCode}`);
+    }
+    return result.trim();
 }
 exports.execReturnOutput = execReturnOutput;
 
@@ -1118,59 +1033,48 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.updatePath = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const path = __importStar(__nccwpck_require__(1017));
 const platform_1 = __nccwpck_require__(9238);
-function updatePath(version) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let cudaPath;
-        switch (yield (0, platform_1.getOs)()) {
-            case platform_1.OSType.linux:
-                cudaPath = `/usr/local/cuda-${version.major}.${version.minor}`;
-                break;
-            case platform_1.OSType.windows:
-                cudaPath = `C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${version.major}.${version.minor}`;
+async function updatePath(version) {
+    let cudaPath;
+    switch (await (0, platform_1.getOs)()) {
+        case platform_1.OSType.linux:
+            cudaPath = `/usr/local/cuda-${version.major}.${version.minor}`;
+            break;
+        case platform_1.OSType.windows:
+            cudaPath = `C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v${version.major}.${version.minor}`;
+    }
+    core.debug(`Cuda path: ${cudaPath}`);
+    // Export $CUDA_PATH
+    core.exportVariable('CUDA_PATH', cudaPath);
+    core.debug(`Cuda path vx_y: ${cudaPath}`);
+    // Export $CUDA_PATH_VX_Y
+    core.exportVariable(`CUDA_PATH_V${version.major}_${version.minor}`, cudaPath);
+    core.exportVariable('CUDA_PATH_VX_Y', `CUDA_PATH_V${version.major}_${version.minor}`);
+    // Add $CUDA_PATH/bin to $PATH
+    const binPath = path.join(cudaPath, 'bin');
+    core.debug(`Adding to PATH: ${binPath}`);
+    core.addPath(binPath);
+    // Update LD_LIBRARY_PATH on linux, see: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#environment-setup
+    if ((await (0, platform_1.getOs)()) === platform_1.OSType.linux) {
+        // Get LD_LIBRARY_PATH
+        const libPath = process.env.LD_LIBRARY_PATH
+            ? process.env.LD_LIBRARY_PATH
+            : '';
+        // Get CUDA lib path
+        const cudaLibPath = path.join(cudaPath, 'lib64');
+        // Check if CUDA lib path is already in LD_LIBRARY_PATH
+        if (!libPath.split(':').includes(cudaLibPath)) {
+            // CUDA lib is not in LD_LIBRARY_PATH, so add it
+            core.debug(`Adding to LD_LIBRARY_PATH: ${cudaLibPath}`);
+            core.exportVariable('LD_LIBRARY_PATH', cudaLibPath + path.delimiter + libPath);
         }
-        core.debug(`Cuda path: ${cudaPath}`);
-        // Export $CUDA_PATH
-        core.exportVariable('CUDA_PATH', cudaPath);
-        core.debug(`Cuda path vx_y: ${cudaPath}`);
-        // Export $CUDA_PATH_VX_Y
-        core.exportVariable(`CUDA_PATH_V${version.major}_${version.minor}`, cudaPath);
-        core.exportVariable('CUDA_PATH_VX_Y', `CUDA_PATH_V${version.major}_${version.minor}`);
-        // Add $CUDA_PATH/bin to $PATH
-        const binPath = path.join(cudaPath, 'bin');
-        core.debug(`Adding to PATH: ${binPath}`);
-        core.addPath(binPath);
-        // Update LD_LIBRARY_PATH on linux, see: https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#environment-setup
-        if ((yield (0, platform_1.getOs)()) === platform_1.OSType.linux) {
-            // Get LD_LIBRARY_PATH
-            const libPath = process.env.LD_LIBRARY_PATH
-                ? process.env.LD_LIBRARY_PATH
-                : '';
-            // Get CUDA lib path
-            const cudaLibPath = path.join(cudaPath, 'lib64');
-            // Check if CUDA lib path is already in LD_LIBRARY_PATH
-            if (!libPath.split(':').includes(cudaLibPath)) {
-                // CUDA lib is not in LD_LIBRARY_PATH, so add it
-                core.debug(`Adding to LD_LIBRARY_PATH: ${cudaLibPath}`);
-                core.exportVariable('LD_LIBRARY_PATH', cudaLibPath + path.delimiter + libPath);
-            }
-        }
-        // Return cuda path
-        return cudaPath;
-    });
+    }
+    // Return cuda path
+    return cudaPath;
 }
 exports.updatePath = updatePath;
 
@@ -1205,15 +1109,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getVersion = void 0;
 const core = __importStar(__nccwpck_require__(2186));
@@ -1221,36 +1116,34 @@ const platform_1 = __nccwpck_require__(9238);
 const semver_1 = __nccwpck_require__(1383);
 const get_links_1 = __nccwpck_require__(1451);
 // Helper for converting string to SemVer and verifying it exists in the links
-function getVersion(versionString, method) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const version = new semver_1.SemVer(versionString);
-        const links = yield (0, get_links_1.getLinks)();
-        let versions;
-        switch (method) {
-            case 'local':
-                versions = links.getAvailableLocalCudaVersions();
-                break;
-            case 'network':
-                switch (yield (0, platform_1.getOs)()) {
-                    case platform_1.OSType.linux:
-                        // TODO adapt this to actual available network versions for linux
-                        versions = links.getAvailableLocalCudaVersions();
-                        break;
-                    case platform_1.OSType.windows:
-                        versions = links.getAvailableNetworkCudaVersions();
-                        break;
-                }
-        }
-        core.debug(`Available versions: ${versions}`);
-        if (versions.find(v => v.compare(version) === 0) !== undefined) {
-            core.debug(`Version available: ${version}`);
-            return version;
-        }
-        else {
-            core.debug(`Version not available error!`);
-            throw new Error(`Version not available: ${version}`);
-        }
-    });
+async function getVersion(versionString, method) {
+    const version = new semver_1.SemVer(versionString);
+    const links = await (0, get_links_1.getLinks)();
+    let versions;
+    switch (method) {
+        case 'local':
+            versions = links.getAvailableLocalCudaVersions();
+            break;
+        case 'network':
+            switch (await (0, platform_1.getOs)()) {
+                case platform_1.OSType.linux:
+                    // TODO adapt this to actual available network versions for linux
+                    versions = links.getAvailableLocalCudaVersions();
+                    break;
+                case platform_1.OSType.windows:
+                    versions = links.getAvailableNetworkCudaVersions();
+                    break;
+            }
+    }
+    core.debug(`Available versions: ${versions}`);
+    if (versions.find(v => v.compare(version) === 0) !== undefined) {
+        core.debug(`Version available: ${version}`);
+        return version;
+    }
+    else {
+        core.debug(`Version not available error!`);
+        throw new Error(`Version not available: ${version}`);
+    }
 }
 exports.getVersion = getVersion;
 
