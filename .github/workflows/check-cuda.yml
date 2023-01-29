@@ -27,18 +27,18 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email github-actions[bot]@users.noreply.github.com
           git config --global core.autocrlf false
-          curl https://developer.nvidia.com/cuda-toolkit-archive -o./cuda-toolkit-archive.html
-          sed -n -i 8p cuda-toolkit-archive.html
-          git diff --ignore-space-at-eol cuda-toolkit-archive.html
-          if [ "$(git diff --ignore-space-at-eol cuda-toolkit-archive.html | wc -l)" -gt "0" ]; then
+          curl https://developer.nvidia.com/cuda-toolkit-archive -O
+          sed -n -i 7p cuda-toolkit-archive
+          git diff --ignore-space-at-eol cuda-toolkit-archive
+          if [ "$(git diff --ignore-space-at-eol cuda-toolkit-archive | wc -l)" -gt "0" ]; then
             echo "update=true" >> $GITHUB_OUTPUT
           else
             echo "update=fales" >> $GITHUB_OUTPUT
           fi
       - uses: actions/upload-artifact@v3
         with:
-          name: cuda-toolkit-archive.html
-          path: cuda-toolkit-archive.html
+          name: cuda-toolkit-archive
+          path: cuda-toolkit-archive
       - name: Check for available updates
         continue-on-error: true
         id: cheak_diff
@@ -49,7 +49,7 @@ jobs:
           git add .
           git commit -m A
           git reflog
-            if [ "$(git diff --ignore-space-at-eol --name-only origin/create-pull-request/cuda..HEAD -- cuda-toolkit-archive.html | wc -l)" -gt "0" ]; then
+            if [ "$(git diff --ignore-space-at-eol --name-only origin/create-pull-request/cuda..HEAD -- cuda-toolkit-archive | wc -l)" -gt "0" ]; then
               echo "diff=true" >> $GITHUB_OUTPUT
             else
               echo "diff=false" >> $GITHUB_OUTPUT
@@ -65,8 +65,8 @@ jobs:
       - name: RE-Checkout
         uses: actions/checkout@v3
       - run: |
-          curl https://developer.nvidia.com/cuda-toolkit-archive -o./cuda-toolkit-archive.html
-          sed -n -i 8p cuda-toolkit-archive.html
+          curl https://developer.nvidia.com/cuda-toolkit-archive -O
+          sed -n -i 7p cuda-toolkit-archive
       - name: Create Pull Request
         id: cpr
         if: ${{ steps.test.outputs.test == 'true' || (inputs.focce == true && always() ) }}
