@@ -91,6 +91,8 @@ jobs:
       - name : skip this minor version
         if: ${{ success() && steps.diff.conclusion == 'success' && github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' && github.event.action == 'opened'}}
         uses: derekprior/add-autoresponse@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.CUDA }}        
         with:
           respondableId: ${{ github.event.pull_request.node_id }}
           response: "@dependabot ignore this minor version"
