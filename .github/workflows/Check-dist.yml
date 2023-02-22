@@ -94,3 +94,4 @@ jobs:
         with:
           respondableId: ${{ github.event.pull_request.node_id }}
           response: "@dependabot ignore this minor version"
+          author: ${{ github.event.pull_request.user.login }}
