@@ -62,13 +62,21 @@ jobs:
           name: dist
           path: dist/
 
-      # If index.js was different push a commit to the PR to fix it
+      # If index.js was different push a commit to the PR to fix it(only if the PR is from dependabot or the repo owner)
       - name: setup-git
-        if: ${{ failure() && steps.diff.conclusion == 'failure' && (github.actor == 'dependabot[bot]' || github.actor == github.repository_owner) }}
+        if: ${{ failure() && steps.diff.conclusion == 'failure' && (github.actor == 'dependabot[bot]' || github.actor == github.repository_owner) && github.event_name == 'pull_request' && github.event.action == 'opened'}}
         id: setup-git
         run: |    
             echo ${{ secrets.CUDA }} | gh auth login --with-token;
-            gh auth setup-git        
+            gh auth setup-git    
+      - uses: derekprior/add-autoresponse@master
+        if: ${{ failure() && steps.diff.conclusion == 'failure' && github.actor == 'dependabot[bot]'}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.CUDA }}
+        with:
+          respondableId: ${{ github.event.pull_request.node_id }}
+          response: "@dependabot squash and merge"
+          author: ${{ github.event.pull_request.user.login }}
       - name: Commit dist/ changes
         if: ${{ failure() && steps.setup-git.conclusion == 'success' }}
         uses: EndBug/add-and-commit@v9
@@ -77,4 +85,12 @@ jobs:
           author_email: github-actions[bot]@users.noreply.github.com
           message: '[skip dependabot] auto update Rebuild dist/'
           add: dist/
-          push: true
+          push: true 
+
+      # If index.js was not different don't marge the PR(only if the PR is from dependabot)
+      - name : skip this minor version
+        if: ${{ success() && steps.diff.conclusion == 'success' && github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' && github.event.action == 'opened'}}
+        uses: derekprior/add-autoresponse@master
+        with:
+          respondableId: ${{ github.event.pull_request.node_id }}
+          response: "@dependabot ignore this minor version"
