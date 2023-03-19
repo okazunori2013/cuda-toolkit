@@ -274,6 +274,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.install = void 0;
 const artifact = __importStar(__nccwpck_require__(2605));
 const core = __importStar(__nccwpck_require__(2186));
+const glob = __importStar(__nccwpck_require__(8090));
 const platform_1 = __nccwpck_require__(9238);
 const exec_1 = __nccwpck_require__(1514);
 async function install(executablePath, version, subPackagesArray, linuxLocalArgsArray) {
@@ -325,7 +326,7 @@ async function install(executablePath, version, subPackagesArray, linuxLocalArgs
         core.debug(`Installer exit code: ${exitCode}`);
     }
     catch (error) {
-        core.debug(`Error during installation: ${error}`);
+        core.warning(`Error during installation: ${error}`);
         throw error;
     }
     finally {
@@ -333,13 +334,20 @@ async function install(executablePath, version, subPackagesArray, linuxLocalArgs
         if ((await (0, platform_1.getOs)()) === platform_1.OSType.linux) {
             const artifactClient = artifact.create();
             const artifactName = 'install-log';
-            const files = ['/var/log/cuda-installer.log'];
-            const rootDirectory = '/var/log';
-            const artifactOptions = {
-                continueOnError: true
-            };
-            const uploadResult = await artifactClient.uploadArtifact(artifactName, files, rootDirectory, artifactOptions);
-            core.debug(`Upload result: ${uploadResult}`);
+            const patterns = ['/var/log/cuda-installer.log'];
+            const globber = await glob.create(patterns.join('\n'));
+            const files = await globber.glob();
+            if (files.length > 0) {
+                const rootDirectory = '/var/log';
+                const artifactOptions = {
+                    continueOnError: true
+                };
+                const uploadResult = await artifactClient.uploadArtifact(artifactName, files, rootDirectory, artifactOptions);
+                core.debug(`Upload result: ${uploadResult}`);
+            }
+            else {
+                core.debug(`No log file to upload`);
+            }
         }
     }
 }
