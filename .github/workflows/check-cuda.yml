@@ -10,66 +10,33 @@ on:
         required: false
         default: false
         type: boolean
+
 jobs:
   check-cuda:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
+
       - name: Check HTTP status
         uses: gerdemann/http-status-code@1.1.1
         with:
           url: https://developer.nvidia.com/cuda-toolkit-archive
           code: 200
-      - name: install dependencies
-        id: cuda-update
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-          git config --global core.autocrlf false
-          curl https://developer.nvidia.com/cuda-toolkit-archive -O
-          sed -i '/<\/script><\/head><body class="html not-front/!d' cuda-toolkit-archive
-          git diff --ignore-space-at-eol cuda-toolkit-archive
-          if [ "$(git diff --ignore-space-at-eol cuda-toolkit-archive | wc -l)" -gt "0" ]; then
-            echo "update=true" >> $GITHUB_OUTPUT
-          else
-            echo "update=fales" >> $GITHUB_OUTPUT
-          fi
-      - uses: actions/upload-artifact@v3
-        with:
-          name: cuda-toolkit-archive
-          path: cuda-toolkit-archive
+
       - name: Check for available updates
-        continue-on-error: true
-        id: cheak_diff
+        id: check_diff
         run: |
-          git branch
-          git fetch origin create-pull-request/cuda || echo "diff=true" >> $GITHUB_OUTPUT
-          git reset origin/create-pull-request/cuda
-          git add .
-          git commit -m A
-          git reflog
-            if [ "$(git diff --ignore-space-at-eol --name-only origin/create-pull-request/cuda..HEAD -- cuda-toolkit-archive | wc -l)" -gt "0" ]; then
-              echo "diff=true" >> $GITHUB_OUTPUT
-            else
-              echo "diff=false" >> $GITHUB_OUTPUT
-            fi 
-      - name: test
-        id: test
-        run: |
-          if [ ${{ steps.cheak_diff.outputs.diff }} == true ] && [ ${{ steps.cuda-update.outputs.update }} == true ]; then
-            echo "test=true" >> $GITHUB_OUTPUT
+          git fetch origin create-pull-request/cuda
+          if git diff --quiet origin/create-pull-request/cuda HEAD -- cuda-toolkit-archive; then
+            echo "diff=false" >> $GITHUB_OUTPUT
           else
-            echo "test=false" >> $GITHUB_OUTPUT
+            echo "diff=true" >> $GITHUB_OUTPUT
           fi
-      - name: RE-Checkout
-        uses: actions/checkout@v3
-      - run: |
-          curl https://developer.nvidia.com/cuda-toolkit-archive -O
-          sed -i '/<\/script><\/head><body class="html not-front/!d' cuda-toolkit-archive
+
       - name: Create Pull Request
         id: cpr
-        if: ${{ steps.test.outputs.test == 'true' || (inputs.focce == true && always() ) }}
+        if: ${{ steps.check_diff.outputs.diff == 'true' || (inputs.focce == true && always()) }}
         uses: peter-evans/create-pull-request@v4
         with:
           commit-message: "[bot]update cuda-toolkit-archive"
@@ -81,3 +48,9 @@ jobs:
           branch: create-pull-request/cuda
           author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
           committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: cuda-toolkit-archive
+          path: cuda-toolkit-archive
