@@ -25,13 +25,18 @@ jobs:
           code: 200
 
       - name: Check for available updates
-        id: check_diff
+        continue-on-error: true
+        id: cheak_diff
         run: |
-          git fetch origin create-pull-request/cuda
-          if git diff --quiet origin/create-pull-request/cuda HEAD -- cuda-toolkit-archive; then
-            echo "diff=false" >> $GITHUB_OUTPUT
-          else
+          git branch -a | grep -q "remotes/origin/create-pull-request/cuda" && git fetch origin create-pull-request/cuda
+          git reset origin/create-pull-request/cuda
+          git add .
+          git commit -m A
+          git reflog
+          if [ "$(git diff --ignore-space-at-eol --name-only origin/create-pull-request/cuda..HEAD -- cuda-toolkit-archive | wc -l)" -gt "0" ]; then
             echo "diff=true" >> $GITHUB_OUTPUT
+          else
+            echo "diff=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Create Pull Request
