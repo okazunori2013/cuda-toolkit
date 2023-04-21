@@ -428,6 +428,10 @@ class LinuxLinks extends links_1.AbstractLinks {
         // Map of cuda SemVer version to download URL
         this.cudaVersionToURL = new Map([
             [
+                '12.1.1',
+                'https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda_12.1.1_530.30.02_linux.run'
+            ],
+            [
                 '12.1.0',
                 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_530.30.02_linux.run'
             ],
@@ -582,6 +586,10 @@ class WindowsLinks extends links_1.AbstractLinks {
         super();
         this.cudaVersionToNetworkUrl = new Map([
             [
+                '12.1.1',
+                'https://developer.download.nvidia.com/compute/cuda/12.1.1/network_installers/cuda_12.1.1_windows_network.exe'
+            ],
+            [
                 '12.1.0',
                 'https://developer.download.nvidia.com/compute/cuda/12.1.0/network_installers/cuda_12.1.0_windows_network.exe'
             ],
@@ -696,6 +704,10 @@ class WindowsLinks extends links_1.AbstractLinks {
         ]);
         // Map of cuda SemVer version to download URL
         this.cudaVersionToURL = new Map([
+            [
+                '12.1.1',
+                'https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda_12.1.1_531.14_windows.exe'
+            ],
             [
                 '12.1.0',
                 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe'
@@ -11913,6 +11925,10 @@ function checkBypass(reqUrl) {
     if (!reqUrl.hostname) {
         return false;
     }
+    const reqHost = reqUrl.hostname;
+    if (isLoopbackAddress(reqHost)) {
+        return true;
+    }
     const noProxy = process.env['no_proxy'] || process.env['NO_PROXY'] || '';
     if (!noProxy) {
         return false;
@@ -11938,13 +11954,24 @@ function checkBypass(reqUrl) {
         .split(',')
         .map(x => x.trim().toUpperCase())
         .filter(x => x)) {
-        if (upperReqHosts.some(x => x === upperNoProxyItem)) {
+        if (upperNoProxyItem === '*' ||
+            upperReqHosts.some(x => x === upperNoProxyItem ||
+                x.endsWith(`.${upperNoProxyItem}`) ||
+                (upperNoProxyItem.startsWith('.') &&
+                    x.endsWith(`${upperNoProxyItem}`)))) {
             return true;
         }
     }
     return false;
 }
 exports.checkBypass = checkBypass;
+function isLoopbackAddress(host) {
+    const hostLower = host.toLowerCase();
+    return (hostLower === 'localhost' ||
+        hostLower.startsWith('127.') ||
+        hostLower.startsWith('[::1]') ||
+        hostLower.startsWith('[0:0:0:0:0:0:0:1]'));
+}
 //# sourceMappingURL=proxy.js.map
 
 /***/ }),
@@ -22076,6 +22103,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 
 var logger$1 = __nccwpck_require__(3233);
 var abortController = __nccwpck_require__(2557);
+var coreUtil = __nccwpck_require__(1333);
 
 // Copyright (c) Microsoft Corporation.
 /**
@@ -22324,7 +22352,7 @@ function transformStatus(inputs) {
         case "cancelled":
             return "canceled";
         default: {
-            logger.warning(`LRO: unrecognized operation status: ${status}`);
+            logger.verbose(`LRO: unrecognized operation status: ${status}`);
             return status;
         }
     }
@@ -22486,58 +22514,6 @@ async function pollHttpOperation(inputs) {
 }
 
 // Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-/**
- * Map an optional value through a function
- * @internal
- */
-const maybemap = (value, f) => value === undefined ? undefined : f(value);
-const INTERRUPTED = new Error("The poller is already stopped");
-/**
- * A promise that delays resolution until a certain amount of time (in milliseconds) has passed, with facilities for
- * robust cancellation.
- *
- * ### Example:
- *
- * ```javascript
- * let toCancel;
- *
- * // Wait 20 seconds, and optionally allow the function to be cancelled.
- * await delayMs(20000, (cancel) => { toCancel = cancel });
- *
- * // ... if `toCancel` is called before the 20 second timer expires, then the delayMs promise will reject.
- * ```
- *
- * @internal
- * @param ms - the number of milliseconds to wait before resolving
- * @param cb - a callback that can provide the caller with a cancellation function
- */
-function delayMs(ms) {
-    let aborted = false;
-    let toReject;
-    return Object.assign(new Promise((resolve, reject) => {
-        let token;
-        toReject = () => {
-            maybemap(token, clearTimeout);
-            reject(INTERRUPTED);
-        };
-        // In the rare case that the operation is _already_ aborted, we will reject instantly. This could happen, for
-        // example, if the user calls the cancellation function immediately without yielding execution.
-        if (aborted) {
-            toReject();
-        }
-        else {
-            token = setTimeout(resolve, ms);
-        }
-    }), {
-        cancel: () => {
-            aborted = true;
-            toReject === null || toReject === void 0 ? void 0 : toReject();
-        },
-    });
-}
-
-// Copyright (c) Microsoft Corporation.
 const createStateProxy$1 = () => ({
     /**
      * The state at this point is created to be of type OperationState<TResult>.
@@ -22589,7 +22565,6 @@ function buildCreatePoller(inputs) {
                 setErrorAsResult: !resolveOnUnsuccessful,
             });
         let resultPromise;
-        let cancelJob;
         const abortController$1 = new abortController.AbortController();
         const handlers = new Map();
         const handleProgressEvents = async () => handlers.forEach((h) => h(state));
@@ -22602,7 +22577,6 @@ function buildCreatePoller(inputs) {
             isStopped: () => resultPromise === undefined,
             stopPolling: () => {
                 abortController$1.abort();
-                cancelJob === null || cancelJob === void 0 ? void 0 : cancelJob();
             },
             toString: () => JSON.stringify({
                 state,
@@ -22620,9 +22594,7 @@ function buildCreatePoller(inputs) {
                 if (!poller.isDone()) {
                     await poller.poll({ abortSignal });
                     while (!poller.isDone()) {
-                        const delay = delayMs(currentPollIntervalInMs);
-                        cancelJob = delay.cancel;
-                        await delay;
+                        await coreUtil.delay(currentPollIntervalInMs, { abortSignal });
                         await poller.poll({ abortSignal });
                     }
                 }
@@ -23597,48 +23569,54 @@ var crypto = __nccwpck_require__(6113);
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-var _a;
+var _a$1;
 /**
  * A constant that indicates whether the environment the code is running is Node.JS.
  */
-const isNode = typeof process !== "undefined" && Boolean(process.version) && Boolean((_a = process.versions) === null || _a === void 0 ? void 0 : _a.node);
+const isNode = typeof process !== "undefined" && Boolean(process.version) && Boolean((_a$1 = process.versions) === null || _a$1 === void 0 ? void 0 : _a$1.node);
 
 // Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
 /**
- * Helper TypeGuard that checks if something is defined or not.
- * @param thing - Anything
+ * Creates an abortable promise.
+ * @param buildPromise - A function that takes the resolve and reject functions as parameters.
+ * @param options - The options for the abortable promise.
+ * @returns A promise that can be aborted.
  */
-function isDefined(thing) {
-    return typeof thing !== "undefined" && thing !== null;
-}
-/**
- * Helper TypeGuard that checks if the input is an object with the specified properties.
- * @param thing - Anything.
- * @param properties - The name of the properties that should appear in the object.
- */
-function isObjectWithProperties(thing, properties) {
-    if (!isDefined(thing) || typeof thing !== "object") {
-        return false;
-    }
-    for (const property of properties) {
-        if (!objectHasProperty(thing, property)) {
-            return false;
+function createAbortablePromise(buildPromise, options) {
+    const { cleanupBeforeAbort, abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
+    return new Promise((resolve, reject) => {
+        function rejectOnAbort() {
+            reject(new abortController.AbortError(abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : "The operation was aborted."));
         }
-    }
-    return true;
-}
-/**
- * Helper TypeGuard that checks if the input is an object with the specified property.
- * @param thing - Any object.
- * @param property - The name of the property that should appear in the object.
- */
-function objectHasProperty(thing, property) {
-    return (isDefined(thing) && typeof thing === "object" && property in thing);
+        function removeListeners() {
+            abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.removeEventListener("abort", onAbort);
+        }
+        function onAbort() {
+            cleanupBeforeAbort === null || cleanupBeforeAbort === void 0 ? void 0 : cleanupBeforeAbort();
+            removeListeners();
+            rejectOnAbort();
+        }
+        if (abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.aborted) {
+            return rejectOnAbort();
+        }
+        try {
+            buildPromise((x) => {
+                removeListeners();
+                resolve(x);
+            }, (x) => {
+                removeListeners();
+                reject(x);
+            });
+        }
+        catch (err) {
+            reject(err);
+        }
+        abortSignal === null || abortSignal === void 0 ? void 0 : abortSignal.addEventListener("abort", onAbort);
+    });
 }
 
 // Copyright (c) Microsoft Corporation.
-const StandardAbortMessage = "The operation was aborted.";
+const StandardAbortMessage = "The delay was aborted.";
 /**
  * A wrapper for setTimeout that resolves a promise after timeInMs milliseconds.
  * @param timeInMs - The number of milliseconds to be delayed.
@@ -23646,35 +23624,14 @@ const StandardAbortMessage = "The operation was aborted.";
  * @returns Promise that is resolved after timeInMs
  */
 function delay(timeInMs, options) {
-    return new Promise((resolve, reject) => {
-        let timer = undefined;
-        let onAborted = undefined;
-        const rejectOnAbort = () => {
-            var _a;
-            return reject(new abortController.AbortError((_a = options === null || options === void 0 ? void 0 : options.abortErrorMsg) !== null && _a !== void 0 ? _a : StandardAbortMessage));
-        };
-        const removeListeners = () => {
-            if ((options === null || options === void 0 ? void 0 : options.abortSignal) && onAborted) {
-                options.abortSignal.removeEventListener("abort", onAborted);
-            }
-        };
-        onAborted = () => {
-            if (isDefined(timer)) {
-                clearTimeout(timer);
-            }
-            removeListeners();
-            return rejectOnAbort();
-        };
-        if ((options === null || options === void 0 ? void 0 : options.abortSignal) && options.abortSignal.aborted) {
-            return rejectOnAbort();
-        }
-        timer = setTimeout(() => {
-            removeListeners();
-            resolve();
-        }, timeInMs);
-        if (options === null || options === void 0 ? void 0 : options.abortSignal) {
-            options.abortSignal.addEventListener("abort", onAborted);
-        }
+    let token;
+    const { abortSignal, abortErrorMsg } = options !== null && options !== void 0 ? options : {};
+    return createAbortablePromise((resolve) => {
+        token = setTimeout(resolve, timeInMs);
+    }, {
+        cleanupBeforeAbort: () => clearTimeout(token),
+        abortSignal,
+        abortErrorMsg: abortErrorMsg !== null && abortErrorMsg !== void 0 ? abortErrorMsg : StandardAbortMessage,
     });
 }
 
@@ -23773,8 +23730,95 @@ async function computeSha256Hash(content, encoding) {
     return crypto.createHash("sha256").update(content).digest(encoding);
 }
 
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+/**
+ * Helper TypeGuard that checks if something is defined or not.
+ * @param thing - Anything
+ */
+function isDefined(thing) {
+    return typeof thing !== "undefined" && thing !== null;
+}
+/**
+ * Helper TypeGuard that checks if the input is an object with the specified properties.
+ * @param thing - Anything.
+ * @param properties - The name of the properties that should appear in the object.
+ */
+function isObjectWithProperties(thing, properties) {
+    if (!isDefined(thing) || typeof thing !== "object") {
+        return false;
+    }
+    for (const property of properties) {
+        if (!objectHasProperty(thing, property)) {
+            return false;
+        }
+    }
+    return true;
+}
+/**
+ * Helper TypeGuard that checks if the input is an object with the specified property.
+ * @param thing - Any object.
+ * @param property - The name of the property that should appear in the object.
+ */
+function objectHasProperty(thing, property) {
+    return (isDefined(thing) && typeof thing === "object" && property in thing);
+}
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+/**
+ * Generated Universally Unique Identifier
+ *
+ * @returns RFC4122 v4 UUID.
+ */
+function generateUUID() {
+    let uuid = "";
+    for (let i = 0; i < 32; i++) {
+        // Generate a random number between 0 and 15
+        const randomNumber = Math.floor(Math.random() * 16);
+        // Set the UUID version to 4 in the 13th position
+        if (i === 12) {
+            uuid += "4";
+        }
+        else if (i === 16) {
+            // Set the UUID variant to "10" in the 17th position
+            uuid += (randomNumber & 0x3) | 0x8;
+        }
+        else {
+            // Add a random hexadecimal digit to the UUID string
+            uuid += randomNumber.toString(16);
+        }
+        // Add hyphens to the UUID string at the appropriate positions
+        if (i === 7 || i === 11 || i === 15 || i === 19) {
+            uuid += "-";
+        }
+    }
+    return uuid;
+}
+
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+var _a;
+// NOTE: This is a workaround until we can use `globalThis.crypto.randomUUID` in Node.js 19+.
+let uuidFunction = typeof ((_a = globalThis === null || globalThis === void 0 ? void 0 : globalThis.crypto) === null || _a === void 0 ? void 0 : _a.randomUUID) === "function"
+    ? globalThis.crypto.randomUUID.bind(globalThis.crypto)
+    : crypto.randomUUID;
+// Not defined in earlier versions of Node.js 14
+if (!uuidFunction) {
+    uuidFunction = generateUUID;
+}
+/**
+ * Generated Universally Unique Identifier
+ *
+ * @returns RFC4122 v4 UUID.
+ */
+function randomUUID() {
+    return uuidFunction();
+}
+
 exports.computeSha256Hash = computeSha256Hash;
 exports.computeSha256Hmac = computeSha256Hmac;
+exports.createAbortablePromise = createAbortablePromise;
 exports.delay = delay;
 exports.getErrorMessage = getErrorMessage;
 exports.getRandomIntegerInclusive = getRandomIntegerInclusive;
@@ -23784,6 +23828,7 @@ exports.isNode = isNode;
 exports.isObject = isObject;
 exports.isObjectWithProperties = isObjectWithProperties;
 exports.objectHasProperty = objectHasProperty;
+exports.randomUUID = randomUUID;
 //# sourceMappingURL=index.js.map
 
 
@@ -23797,14 +23842,16 @@ exports.objectHasProperty = objectHasProperty;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
-var util = _interopDefault(__nccwpck_require__(3837));
 var os = __nccwpck_require__(2037);
+var util = __nccwpck_require__(3837);
+
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+var util__default = /*#__PURE__*/_interopDefaultLegacy(util);
 
 // Copyright (c) Microsoft Corporation.
 function log(message, ...args) {
-    process.stderr.write(`${util.format(message, ...args)}${os.EOL}`);
+    process.stderr.write(`${util__default["default"].format(message, ...args)}${os.EOL}`);
 }
 
 // Copyright (c) Microsoft Corporation.
@@ -23822,7 +23869,7 @@ const debugObj = Object.assign((namespace) => {
     enable,
     enabled,
     disable,
-    log
+    log,
 });
 function enable(namespaces) {
     enabledString = namespaces;
@@ -23869,7 +23916,7 @@ function createDebugger(namespace) {
         destroy,
         log: debugObj.log,
         namespace,
-        extend
+        extend,
     });
     function debug(...args) {
         if (!newDebugger.enabled) {
@@ -23896,6 +23943,7 @@ function extend(namespace) {
     newDebugger.log = this.log;
     return newDebugger;
 }
+var debug = debugObj;
 
 // Copyright (c) Microsoft Corporation.
 const registeredLoggers = new Set();
@@ -23906,9 +23954,9 @@ let azureLogLevel;
  * By default, logs are sent to stderr.
  * Override the `log` method to redirect logs to another location.
  */
-const AzureLogger = debugObj("azure");
+const AzureLogger = debug("azure");
 AzureLogger.log = (...args) => {
-    debugObj.log(...args);
+    debug.log(...args);
 };
 const AZURE_LOG_LEVELS = ["verbose", "info", "warning", "error"];
 if (logLevelFromEnv) {
@@ -23921,7 +23969,7 @@ if (logLevelFromEnv) {
     }
 }
 /**
- * Immediately enables logging at the specified log level.
+ * Immediately enables logging at the specified log level. If no level is specified, logging is disabled.
  * @param level - The log level to enable for logging.
  * Options from most verbose to least verbose are:
  * - verbose
@@ -23940,7 +23988,7 @@ function setLogLevel(level) {
             enabledNamespaces.push(logger.namespace);
         }
     }
-    debugObj.enable(enabledNamespaces.join(","));
+    debug.enable(enabledNamespaces.join(","));
 }
 /**
  * Retrieves the currently specified log level.
@@ -23952,7 +24000,7 @@ const levelMap = {
     verbose: 400,
     info: 300,
     warning: 200,
-    error: 100
+    error: 100,
 };
 /**
  * Creates a logger for use by the Azure SDKs that inherits from `AzureLogger`.
@@ -23966,7 +24014,7 @@ function createClientLogger(namespace) {
         error: createLogger(clientRootLogger, "error"),
         warning: createLogger(clientRootLogger, "warning"),
         info: createLogger(clientRootLogger, "info"),
-        verbose: createLogger(clientRootLogger, "verbose")
+        verbose: createLogger(clientRootLogger, "verbose"),
     };
 }
 function patchLogMethod(parent, child) {
@@ -23976,23 +24024,18 @@ function patchLogMethod(parent, child) {
 }
 function createLogger(parent, level) {
     const logger = Object.assign(parent.extend(level), {
-        level
+        level,
     });
     patchLogMethod(parent, logger);
     if (shouldEnable(logger)) {
-        const enabledNamespaces = debugObj.disable();
-        debugObj.enable(enabledNamespaces + "," + logger.namespace);
+        const enabledNamespaces = debug.disable();
+        debug.enable(enabledNamespaces + "," + logger.namespace);
     }
     registeredLoggers.add(logger);
     return logger;
 }
 function shouldEnable(logger) {
-    if (azureLogLevel && levelMap[logger.level] <= levelMap[azureLogLevel]) {
-        return true;
-    }
-    else {
-        return false;
-    }
+    return Boolean(azureLogLevel && levelMap[logger.level] <= levelMap[azureLogLevel]);
 }
 function isAzureLogLevel(logLevel) {
     return AZURE_LOG_LEVELS.includes(logLevel);
@@ -32519,7 +32562,7 @@ const timeoutInSeconds = {
 const version = {
     parameterPath: "version",
     mapper: {
-        defaultValue: "2021-12-02",
+        defaultValue: "2022-11-02",
         isConstant: true,
         serializedName: "x-ms-version",
         type: {
@@ -37350,8 +37393,8 @@ const logger = logger$1.createClientLogger("storage-blob");
 
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-const SDK_VERSION = "12.13.0";
-const SERVICE_VERSION = "2021-12-02";
+const SDK_VERSION = "12.14.0";
+const SERVICE_VERSION = "2022-11-02";
 const BLOCK_BLOB_MAX_UPLOAD_BLOB_BYTES = 256 * 1024 * 1024; // 256MB
 const BLOCK_BLOB_MAX_STAGE_BLOCK_BYTES = 4000 * 1024 * 1024; // 4000MB
 const BLOCK_BLOB_MAX_BLOCKS = 50000;
@@ -39209,7 +39252,7 @@ class StorageSharedKeyCredential extends Credential {
  * Changes may cause incorrect behavior and will be lost if the code is regenerated.
  */
 const packageName = "azure-storage-blob";
-const packageVersion = "12.13.0";
+const packageVersion = "12.14.0";
 class StorageClientContext extends coreHttp__namespace.ServiceClient {
     /**
      * Initializes a new instance of the StorageClientContext class.
@@ -39235,7 +39278,7 @@ class StorageClientContext extends coreHttp__namespace.ServiceClient {
         // Parameter assignments
         this.url = url;
         // Assigning values to Constant parameters
-        this.version = options.version || "2021-12-02";
+        this.version = options.version || "2022-11-02";
     }
 }
 
@@ -43261,6 +43304,9 @@ class BlobClient extends StorageClient {
             // (url: string, credential?: StorageSharedKeyCredential | AnonymousCredential | TokenCredential, options?: StoragePipelineOptions)
             // The second parameter is undefined. Use anonymous credential.
             url = urlOrConnectionString;
+            if (blobNameOrOptions && typeof blobNameOrOptions !== "string") {
+                options = blobNameOrOptions;
+            }
             pipeline = newPipeline(new AnonymousCredential(), options);
         }
         else if (credentialOrPipelineOrContainerName &&
@@ -44564,6 +44610,9 @@ class BlockBlobClient extends BlobClient {
             // (url: string, credential?: StorageSharedKeyCredential | AnonymousCredential | TokenCredential, options?: StoragePipelineOptions)
             // The second parameter is undefined. Use anonymous credential.
             url = urlOrConnectionString;
+            if (blobNameOrOptions && typeof blobNameOrOptions !== "string") {
+                options = blobNameOrOptions;
+            }
             pipeline = newPipeline(new AnonymousCredential(), options);
         }
         else if (credentialOrPipelineOrContainerName &&
@@ -50324,7 +50373,7 @@ function registerGlobal(type, instance, diag, allowOverride = false) {
     }
     if (api.version !== version_1.VERSION) {
         // All registered APIs must be of the same version exactly
-        const err = new Error('@opentelemetry/api: All API registration versions must match');
+        const err = new Error(`@opentelemetry/api: Registration of version v${api.version} for ${type} does not match previously registered API v${version_1.VERSION}`);
         diag.error(err.stack || err.message);
         return false;
     }
@@ -51834,7 +51883,7 @@ var TraceFlags;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.VERSION = void 0;
 // this is autogenerated file, see scripts/version-update.js
-exports.VERSION = '1.4.0';
+exports.VERSION = '1.4.1';
 //# sourceMappingURL=version.js.map
 
 /***/ }),
