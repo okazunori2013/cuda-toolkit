@@ -996,7 +996,7 @@ var OSType;
 (function (OSType) {
     OSType["windows"] = "windows";
     OSType["linux"] = "linux";
-})(OSType = exports.OSType || (exports.OSType = {}));
+})(OSType || (exports.OSType = OSType = {}));
 async function getOs() {
     const osPlatform = os_1.default.platform();
     switch (osPlatform) {
