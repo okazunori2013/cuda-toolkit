@@ -47,7 +47,7 @@ jobs:
           git fetch origin create-pull-request/cuda || echo "diff=true" >> $GITHUB_OUTPUT
           git reset origin/create-pull-request/cuda
           git add .
-          git commit -m A
+          git commit -m [bot]update cuda-toolkit-archive
           git reflog
             if [ "$(git diff --ignore-space-at-eol --name-only origin/create-pull-request/cuda..HEAD -- cuda-toolkit-archive | wc -l)" -gt "0" ]; then
               echo "diff=true" >> $GITHUB_OUTPUT
