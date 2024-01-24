@@ -6,40 +6,30 @@ import {download} from './downloader'
 import {getVersion} from './version'
 import {install} from './installer'
 import {updatePath} from './update-path'
-import {parsePackages} from './parser'
 
 async function run(): Promise<void> {
   try {
     const cuda: string = core.getInput('cuda')
     core.debug(`Desired cuda version: ${cuda}`)
-    const subPackagesArgName = 'sub-packages'
-    const subPackages: string = core.getInput(subPackagesArgName)
-    core.debug(`Desired subPackages: ${subPackages}`)
-    const nonCudaSubPackagesArgName = 'non-cuda-sub-packages'
-    const nonCudaSubPackages: string = core.getInput(nonCudaSubPackagesArgName)
-    core.debug(`Desired nonCudasubPackages: ${nonCudaSubPackages}`)
+    const subPackages: string = core.getInput('sub-packages')
+    core.debug(`Desired subPackes: ${subPackages}`)
     const methodString: string = core.getInput('method')
     core.debug(`Desired method: ${methodString}`)
     const linuxLocalArgs: string = core.getInput('linux-local-args')
     core.debug(`Desired local linux args: ${linuxLocalArgs}`)
     const useGitHubCache: boolean = core.getBooleanInput('use-github-cache')
     core.debug(`Desired GitHub cache usage: ${useGitHubCache}`)
-    const useLocalCache: boolean = core.getBooleanInput('use-local-cache')
-    core.debug(`Desired local cache usage: ${useLocalCache}`)
-    const logFileSuffix: string = core.getInput('log-file-suffix')
-    core.debug(`Desired log file suffix: ${logFileSuffix}`)
 
     // Parse subPackages array
-    const subPackagesArray: string[] = await parsePackages(
-      subPackages,
-      subPackagesArgName
-    )
-
-    // Parse nonCudaSubPackages array
-    const nonCudaSubPackagesArray: string[] = await parsePackages(
-      nonCudaSubPackages,
-      nonCudaSubPackagesArgName
-    )
+    let subPackagesArray: string[] = []
+    try {
+      subPackagesArray = JSON.parse(subPackages)
+      // TODO verify that elements are valid package names (nvcc, etc.)
+    } catch (error) {
+      const errString = `Error parsing input 'sub-packages' to a JSON string array: ${subPackages}`
+      core.debug(errString)
+      throw new Error(errString)
+    }
 
     // Parse method
     const methodParsed: Method = parseMethod(methodString)
@@ -76,18 +66,13 @@ async function run(): Promise<void> {
       // Setup aptitude repos
       await aptSetup(version)
       // Install packages
-      const installResult = await aptInstall(
-        version,
-        subPackagesArray,
-        nonCudaSubPackagesArray
-      )
+      const installResult = await aptInstall(version, subPackagesArray)
       core.debug(`Install result: ${installResult}`)
     } else {
       // Download
       const executablePath: string = await download(
         version,
         methodParsed,
-        useLocalCache,
         useGitHubCache
       )
 
@@ -96,9 +81,7 @@ async function run(): Promise<void> {
         executablePath,
         version,
         subPackagesArray,
-        linuxLocalArgsArray,
-        methodString,
-        logFileSuffix
+        linuxLocalArgsArray
       )
     }
 

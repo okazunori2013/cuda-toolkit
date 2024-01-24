@@ -46,8 +46,7 @@ export async function aptSetup(version: SemVer): Promise<void> {
 
 export async function aptInstall(
   version: SemVer,
-  subPackages: string[],
-  nonCudaSubPackages: string[]
+  subPackages: string[]
 ): Promise<number> {
   const osType = await getOs()
   if (osType !== OSType.linux) {
@@ -62,15 +61,9 @@ export async function aptInstall(
     return await exec(`sudo apt-get -y install`, [packageName])
   } else {
     // Only install specified packages
-    const prefixedSubPackages = subPackages.map(
-      subPackage => `cuda-${subPackage}`
+    const versionedSubPackages = subPackages.map(
+      subPackage => `cuda-${subPackage}-${version.major}-${version.minor}`
     )
-    const versionedSubPackages = prefixedSubPackages
-      .concat(nonCudaSubPackages)
-      .map(
-        nonCudaSubPackage =>
-          `${nonCudaSubPackage}-${version.major}-${version.minor}`
-      )
     core.debug(`Only install subpackages: ${versionedSubPackages}`)
     return await exec(`sudo apt-get -y install`, versionedSubPackages)
   }
