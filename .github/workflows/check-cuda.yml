@@ -28,7 +28,7 @@ jobs:
           git config user.email github-actions[bot]@users.noreply.github.com
           git config --global core.autocrlf false
           curl https://developer.nvidia.com/cuda-toolkit-archive -O
-          sed -i '/<\/script><\/head><body class="html not-front/!d' cuda-toolkit-archive
+          sed -i '/<p><strong>Latest Release<\/strong>/!d' cuda-toolkit-archive
           git diff --ignore-space-at-eol cuda-toolkit-archive
           if [ "$(git diff --ignore-space-at-eol cuda-toolkit-archive | wc -l)" -gt "0" ]; then
             echo "update=true" >> $GITHUB_OUTPUT
