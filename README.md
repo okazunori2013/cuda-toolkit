@@ -8,7 +8,7 @@ This action installs the [NVIDIA® CUDA® Toolkit](https://developer.nvidia.com/
 
 **Optional** The CUDA version to install. View `src/link/windows-links.ts` and `src/link/linux-links.ts` for available versions.
 
-Default: `'12.1.1'`.
+Default: `'12.3.2'`.
 
 ### `sub-packages`
 
@@ -55,7 +55,7 @@ steps:
 - uses: okazunori2013/cuda-toolkit@v0.3.6
   id: cuda-toolkit
   with:
-    cuda: '12.1.1'
+    cuda: '12.3.2'
 
 - run: echo "Installed cuda version is: ${{steps.cuda-toolkit.outputs.cuda}}"
 

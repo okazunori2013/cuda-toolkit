@@ -27,7 +27,7 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # npm cache
       - name: Get npm cache directory
@@ -66,12 +66,14 @@ jobs:
         with:
           method: ${{matrix.method}}
 
-      - name: Run the action on this runner with nvcc subpackage only (Linux)
+      - name: Run the action on this runner with nvcc and libcublas subpackages (Linux)
         if: runner.os == 'Linux' && matrix.method == 'network'
         uses: ./
         with:
           method: ${{matrix.method}}
           sub-packages: '["nvcc"]'
+          non-cuda-sub-packages: '["libcublas"]'
+          log-file-suffix: 'nvcc-libcublas'
 
       - name: Run the action on this runner with nvcc subpackage only (Windows)
         if: runner.os == 'Windows'
@@ -79,6 +81,7 @@ jobs:
         with:
           method: ${{matrix.method}}
           sub-packages: '["nvcc"]'
+          log-file-suffix: 'nvcc'
 
       - name: Test if nvcc is available
         run: nvcc -V
